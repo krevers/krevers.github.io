@@ -1,0 +1,310 @@
+---
+title: "What Makes a Tornado Twist: An Analysis on Weather"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+#imports
+library(flexdashboard)
+library(tidyverse)
+library(leaflet)
+library(dplyr)
+library(tidyr)
+library(tigris)
+library(sf)
+library(plyr)
+library(readxl)
+library(usmap)
+library(stringr)
+library(usmap)
+library(shiny)
+library(plyr)
+library(plotly)
+options(device = "X11") 
+X11.options(type = "cairo")
+options(tigris_class = "sf")
+neb_map <- counties("NE", cb=TRUE) 
+```
+
+
+# Tornadoes in the USA
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+### Introduction 
+For my final project, I decided to focus on Tornadoes. This was a huge special interest of mine as a kid. In fact, my dream job in elementary school was to be a storm chaser, or in the back with the radars. This data set from NOAA contains information about tornadoes from 1950-2021. There were over 68,000 entrees and 13 columns. Through my analysis, I wanted to showcase where tornadoes are common and then dive deep into how they correlate with rain and temperature in Nebraska. This data can be used to help understand where tornadoes are common, the repercussions, and what causes these eerily beautiful formations.
+
+### Tornadoes in the USA
+When graphing this map, it shows a clear line of higher frequencies in Tornado Alley. A common misconception about tornados is that it only appears in Tornado Alley. While it is most common, tornados can appear anywhere in the United States. As you hover over states you see states Washington has had 128 tornadoes, while Maine only has 136. As you hover over, be prepared for some fun unexpected numbers!
+
+### Tornado Alley 
+Tornado Alley is a region in the central United States that is known for its high frequency of tornadoes from March to June. It is generally defined as an area stretching from Texas in the south to South Dakota. The following states are included: Texas, Oklahoma, Kansas, Nebraska, South Dakota, Iowa, Minnesota, Wisconsin, Illinois, Indiana, Missouri, North Dakota, Montana, Ohio, and eastern portions of Colorado. Tornado Alley was formed by a unique combination of atmospheric conditions, including warm, moist air from the Gulf of Mexico colliding with dry, cool air from the Rocky Mountains. This crash of air masses creates instability in the atmosphere and can lead to the formation of severe thunderstorms and tornadoes. I plotted a graph expanding the map, showing the frequency of tornadoes from 1950-2021. Texas has the highest frequency of Tornadoes with a cumulative number of 9210 tornadoes. That is about 130 tornadoes a year. While Nebraska is ranked 4th overall for most tornadoes with about 42 tornadoes a year.
+
+### Injuries from Tornados
+In my last visualization, I wanted to compare the average number of injuries from every state. There is a clear decrease in the average amount of people injured due to tornadoes. This is a very multimodal graph that emphasizes the on and off seasons of tornadoes. There was a slightly higher-than-usual resurgence of injuries shortly after 2010. Throughout the year people have been more educated about tornadoes, and more safety procedures have been installed to help prevent any injuries.
+
+
+### Sources
+* <http://www.spc.noaa.gov/wcm/#data> 
+* <http://www.rcc-acis.org/docs_gridded.html>
+* <http://snr.unl.edu/research/projects/climateimpacts/index.aspx?utm_source=Google&utm_medium=email&utm_term=&utm_content=&utm_campaign=Sector%20based%20Roundtables>
+
+-------------------------------------------------------
+
+
+## Column 1 {data-width=600}
+
+
+
+### Tornadoes in the USA
+
+```{r include=FALSE}
+
+tornados<-read.csv("1950-2021_torn.csv")
+
+#getting the freq of tornadoes
+tornfreq<-count(tornados, "st")
+str(tornfreq)
+
+
+#setting it up to merge NE -> Nebraska
+tornfreq$st<-state.name[match(tornfreq$st, state.abb)] 
+tornfreq$st<-tolower(tornfreq$st) #making it lowercase to merge 
+tornados
+
+states <- map_data("state")
+states
+#str_to_title(states$region)
+
+StateFreq<-left_join(states,tornfreq,by=c("region"="st"))
+str(StateFreq)
+colnames(StateFreq)[7] ="Tornadoes"
+```
+
+```{r, fig.width = 15, fig.height=10}
+StateFreqMap <- ggplot(data = StateFreq) + 
+  geom_polygon(aes(x = long, y = lat, group=group, fill=Tornadoes), color = "black")+ 
+  coord_fixed(1.3) +
+  theme_void()+
+  scale_fill_distiller(palette="Blues",direction=1)+
+  labs(title = "Tornado Frequency in the USA",
+       subtitle = "from 1950-2021",
+       fill= "Number of Tornadoes")
+ggplotly(StateFreqMap)
+
+```
+
+
+## Column 2 {data-width= 400, .tabset}
+
+
+### Tornado Alley 
+```{r include=FALSE}
+newfreq<-count(tornados, "st")
+newfreq
+
+#Texas, through Oklahoma, Kansas, Nebraska, South Dakota, Iowa, Minnesota, Wisconsin, Illinois, Indiana, Missouri, Arkansas, North Dakota, Montana, Ohio, and eastern portions of Colorado 
+
+newfreq <- newfreq %>% filter(st == "NE" | st == "KS" | st == "IA" | st =="OK"| st =="TX"| st =="SD"| st =="MN"| st =="WI"| st =="IL"| st =="NM"| st =="ND"| st =="OH"| st =="CO"| st =="MO")
+str(newfreq)
+
+#x1  = factor(x, levels=c("TX", "KS", "OK","NE","IA","MO","CO","MN","SD","ND","WI","OH","NM"))
+
+#x = reorder(st, -freq)
+```
+
+```{r}
+
+
+TornAlly <- ggplot(newfreq)+
+  geom_bar(stat = "identity", aes(x =reorder(st, -freq), y = freq), color = "deepskyblue4",  fill = "#2680e3")+
+  labs(title = "Tornado Alley Frequency",
+       subtitle = "from 1950-2021",
+       x= "States",
+       y= "Number of Tornadoes")
+TornAlly
+
+
+ggplotly(TornAlly)
+```
+
+
+### Average Injuies
+
+```{r include=FALSE}
+injtorn1<-aggregate(tornados$inj, list(tornados$yr), FUN=mean) 
+injtorn1
+
+#rename variables 
+injtorn1 <- injtorn1 %>% 
+  rename("Year" = "Group.1",
+         "Average_Injured" = "x")
+```
+
+```{r}
+
+injtorn <- ggplot(injtorn1, aes(x=Year, y=Average_Injured))+
+  geom_line()+
+  labs(title = "Average Number of People Injured from Tornadoes",
+       subtitle = "from 1950-2021",
+       y = "Average Number Injured",
+       x = "Years")
+  #theme(text= element_text(size=13))
+
+ggplotly(injtorn)
+```
+
+
+
+Rain in Correlation to Tornadoes
+========================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+### Tornados in Nebraska
+For my first visual I mapped out all tornadoes in Nebraska. The plots show where the tornado started and highlight the tornado's width. The larger dots emphasized the width of the physical tornado. There were some with a few yards, but there were some monsters as wide as 4400 yards. There were more clusters in the east and west of Nebraska. It is interactive to tell you the width of the tornado and how many people were injured. 
+
+### Rain Choropleth Map 
+I wanted to be able to compare the average amount of rain in each county, in relation to tornadoes. My data set takes the average amount of rainfall from 1991-2000. I decided to put them side by side in my dashboard to compare. My finding was not what I expected, as the countries that get the least amount of rain, had more tornadoes. 
+
+Column
+-----------------------------------------------------------------------
+
+
+### Tornados in Nebraska 
+
+
+```{r}
+#changing it to numeric so i can manipulate the data 
+NEtorn <- tornados%>%mutate_at(c("slat","slon", "elat", "elon"), as.numeric) %>% #find diff map 
+  dplyr::filter(st == 'NE') #filtering it to just Nebraska 
+#str(NEtorn) 
+#view(NEtorn)
+
+#first plot start 
+leaflet(NEtorn) %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng=-99.96981013652046,lat=41.70615000252273, zoom = 6.4) %>% # somewhere in the middle of NE
+  addCircles(~slon, ~slat, 
+             popup=paste("This tornado had a width of", NEtorn$wid, "yards", "<br>", "There were", NEtorn$inj, "injuries"), 
+             weight = 2, radius=NEtorn$wid*6, #making width the tornado but exaggerated
+             color="#2680e3", stroke = TRUE, fillOpacity = .5) 
+
+```
+
+
+
+
+-----------------------------------------------------------------------
+
+### Rain Choropleth Map 
+```{r include=FALSE}
+rain<-read.csv("High Plains Regional Climate Center rain.csv")
+rain <- na.omit(rain)
+str(rain)
+
+avg1<- rowMeans(rain[,-1]) #taking the average of all the months but not including the first column
+avg <- round(avg1, digits = 3) #rounding the average to 3 digits
+
+neb_map <- counties("NE", cb=TRUE) #setting cb=FAlSE gives most detailed plot
+neb_map
+
+join_data<-left_join(neb_map,rain,by=c("NAMELSAD"="County")) #joining the df together 
+join_data
+
+color_pal <- colorNumeric("Blues", avg) #making it blue by the avg 
+
+```
+
+```{r}
+leaflet() %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng=-99.96981013652046,lat=41.70615000252273, zoom = 6.4) %>% 
+  addPolygons(data = join_data, 
+              fillColor = ~color_pal(avg), 
+              fillOpacity = 0.9, 
+              weight = 0.5, 
+              smoothFactor = .1,
+              popup =paste0(join_data$NAMELSAD,"<br>", "Average amount of rainfall: ",avg, " in"))%>%
+  addLegend(pal = color_pal,
+            values = avg,
+            position = "bottomright",
+            title = "Rainfall in inches",
+            labFormat = labelFormat(suffix ="in"))
+
+```
+
+
+
+Temperature in Correlation to Tornadoes
+==============================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+### Temperature in Correlation to Tornadoes
+
+When comparing the average temperature and tornado frequency. I initially expected to see an increase in temperature along with an increase in tornados, but through my findings, there was no correlation. The temperature has only increased in Nebraska by about 1 degree Fahrenheit since 1895.  Though tornadoes will produce more frequently in warmer weather, it will be more time until we see a dramatic increase.
+
+```{r include=FALSE}
+temp<-read_excel("Average Temp Nebraska.xlsx")
+temp <- na.omit(temp)
+temp
+
+#cleaning up the tornado data set
+NETorn <- tornados%>%  
+  filter(st == "NE")  #filtering to only Nebraska 
+
+#freq count
+NETornfreq<-count(NETorn$yr) 
+
+#combining
+NEtorntemp<-left_join(NETornfreq,temp,by=c("x"="Date")) 
+str(NEtorntemp)
+
+NEtorntemp <- NEtorntemp %>% 
+  rename("Year" = "x",
+         "Tornadoes" = "freq",
+         "Temperature"= "Value")
+
+
+#making it a date 
+#NEtorntemp$x <- as.Date(as.character(NEtorntemp$x), "%Y") #does not work
+#class(NEtorntemp$x)
+
+#all Na's doesnt work
+#making x (year) a date 
+#NEtorntemp$x <- as.Date(NEtorntemp$x, "%Y")
+```
+
+
+
+Column
+---------------------------------------------------
+
+
+### Temperature in Correlation to Tornadoes
+```{r}
+
+#PLOT
+testtorn <-ggplot(NEtorntemp) + 
+  geom_bar(stat = "identity", aes(x = Year, y = Tornadoes), size = .2, color = "grey13",  fill = "#2680e3") +
+  geom_line(aes(x = Year, y = Temperature), size = 1, color="red", group = 1)+
+  scale_y_continuous(name= "Frequency of Tornadoes", sec.axis = sec_axis(~./1, name = "Temperature in Fahrenheit"))+
+  scale_x_continuous(name = "Years")+
+  labs(title = "Cumulations of Tornadoes in Relation to Average Temperature in Fahrenheit ",
+       subtitle = "in Nebraska from 1950-2021")
+testtorn
+ggplotly(testtorn) #takes away double axis :(
+
+
+```
+
+
+
+
